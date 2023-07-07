@@ -1,6 +1,10 @@
-from math import cos
-from os import stat
+
 import sys
+import time
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from PIL import Image, ImageDraw
+
 
 # sys.path.append("..")
 from queue import LifoQueue, PriorityQueue, Queue
@@ -11,6 +15,8 @@ class Node():
         self.state = state
         self.parent = parent
         self.action = action
+        
+        
 
     def __lt__(self, other):  # 优先级队列元组比较可能用到（第一个数字相等）
         return 0
@@ -36,6 +42,17 @@ class Maze():
         contents = contents.splitlines()
         self.height = len(contents)
         self.width = max(len(line) for line in contents)
+        
+        self.cell_size = 50
+        self.cell_border = 2
+
+        # Create a blank canvas
+        self.img = Image.new(
+            "RGBA",
+            (self.width * self.cell_size, self.height * self.cell_size),
+            "black"
+        )
+        self.draw = ImageDraw.Draw(self.img)
 
         # Keep track of walls
         self.walls = []
@@ -115,7 +132,7 @@ class Maze():
             cost_so_far = dict()
             cost_so_far[start.state] = 0
 
-        # Initialize an empty explored set
+        # Initialize an empty explored set,探测过而不是访问过
         self.explored = set()
         self.explored.add(start.state)
 
@@ -132,6 +149,8 @@ class Maze():
             else:
                 node = frontier.get()[1]
             self.num_explored += 1
+            self.draw_image(show_solution=False,show_explored=True)
+            yield self.img
 
             # If node is the goal, then we have a solution
             if node.state == self.goal:
@@ -144,11 +163,13 @@ class Maze():
                 actions.reverse()
                 cells.reverse()
                 self.solution = (actions, cells)
+                self.draw_image(show_solution=True,show_explored=True)
+                yield self.img
                 return
+                
 
             # Add neighbors to frontier
             for action, state in self.neighbors(node.state):
-                # if not frontier.contains_state(state) and state not in self.explored:
                 if self.method == "A" or self.method == "D":
                     new_cost = cost_so_far[node.state] + 1
                     # 新节点和旧节点的新路径
@@ -175,19 +196,7 @@ class Maze():
     def heuristic(self, state):
         return abs(self.goal[0]-state[0])+abs(self.goal[1]-state[1])
 
-    def output_image(self, filename, show_solution=True, show_explored=False):
-        from PIL import Image, ImageDraw
-        cell_size = 50
-        cell_border = 2
-
-        # Create a blank canvas
-        img = Image.new(
-            "RGBA",
-            (self.width * cell_size, self.height * cell_size),
-            "black"
-        )
-        draw = ImageDraw.Draw(img)
-
+    def draw_image(self,show_solution=False,show_explored=False):
         solution = self.solution[1] if self.solution is not None else None
         for i, row in enumerate(self.walls):
             for j, col in enumerate(row):
@@ -217,24 +226,38 @@ class Maze():
                     fill = (237, 240, 252)
 
                 # Draw cell
-                draw.rectangle(
-                    ([(j * cell_size + cell_border, i * cell_size + cell_border),
-                      ((j + 1) * cell_size - cell_border, (i + 1) * cell_size - cell_border)]),
+                self.draw.rectangle(
+                    ([(j * self.cell_size + self.cell_border, i * self.cell_size + self.cell_border),
+                      ((j + 1) * self.cell_size - self.cell_border, (i + 1) * self.cell_size - self.cell_border)]),
                     fill=fill
                 )
+        # self.img.save(filename)
+        
+        
+    
+        
+        
 
-        img.save(filename)
 
+# if len(sys.argv) != 3:
+#     sys.exit("Usage: python maze.py maze.txt BFS/DFS/D/H/A")
 
-if len(sys.argv) != 3:
-    sys.exit("Usage: python maze.py maze.txt BFS/DFS/D/H/A")
+# m = Maze(sys.argv[1], sys.argv[2])
+m=Maze("C:\\Users\\nmnmnmnm\\Desktop\\AI-PYTHON\\Search\\maze\\maze.txt","A")
+# print("Maze:")
+# m.print()
+# print("Solving...")
+# m.solve()
+# print("States Explored:", m.num_explored)
+# print("Solution:")
+# m.print()
+# m.draw_image("maze.png", show_explored=True)
 
-m = Maze(sys.argv[1], sys.argv[2])
-print("Maze:")
-m.print()
-print("Solving...")
-m.solve()
-print("States Explored:", m.num_explored)
-print("Solution:")
-m.print()
-m.output_image("maze.png", show_explored=True)
+fig, ax = plt.subplots()
+
+def update(img):
+    ax.clear()
+    ax.imshow(img)
+ani = animation.FuncAnimation(fig,update, m.solve ,interval=100,repeat=False)
+plt.show()#放在后面gif会出问题
+ani.save("demo1.gif")
